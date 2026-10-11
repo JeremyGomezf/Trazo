@@ -197,8 +197,8 @@
 
   /* ---------- Historial ---------- */
   const H = (T.hist = { undo: [], redo: [], bytes: 0 });
-  const LOW = /Android|iPhone|iPad|Mobile/.test(navigator.userAgent) || (navigator.deviceMemory && navigator.deviceMemory <= 4);
-  const LIMIT = LOW ? 180e6 : 600e6;
+  const MEM = navigator.deviceMemory || (/Android|iPhone|iPad|Mobile/.test(navigator.userAgent) ? 4 : 8);
+  const LIMIT = MEM <= 2 ? 120e6 : MEM <= 4 ? 260e6 : 600e6;
 
   function opBytes(op) {
     switch (op.t) {

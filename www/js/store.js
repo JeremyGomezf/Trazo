@@ -46,7 +46,14 @@
     }
   };
 
-  const toBlob = (c, type, q) => new Promise((res) => c.toBlob((b) => res(b), type || 'image/png', q));
+  /* Se usa toDataURL (síncrono) porque en el WebView de Android canvas.toBlob tarda ~4 s fijos por llamada */
+  const toBlob = (c, type, q) => {
+    type = type || 'image/png';
+    const u = c.toDataURL(type, q), bin = atob(u.slice(u.indexOf(',') + 1));
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return Promise.resolve(new Blob([arr], { type }));
+  };
   T.toBlob = toBlob;
   async function blobToCanvasImage(blob) {
     if (window.createImageBitmap) {

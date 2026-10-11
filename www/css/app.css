@@ -147,7 +147,7 @@ button:disabled { cursor: default; }
 .lefty .quick { left: auto; right: 10px; }
 .vs { position: relative; width: 28px; height: min(22vh, 170px); border-radius: 14px; background: var(--soft); overflow: visible; touch-action: none; cursor: ns-resize; }
 .vfill { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 14px; background: var(--accent-soft); }
-.vs:last-child .vfill { background: color-mix(in srgb, var(--qc, var(--accent)) 45%, transparent); }
+.vs:last-child .vfill { background: color-mix(in srgb, var(--accent) 55%, transparent); }
 .vknob { position: absolute; left: 50%; width: 22px; height: 22px; margin: 0 0 -11px -11px; border-radius: 50%; background: var(--raise); border: 2px solid var(--accent); box-shadow: 0 1px 4px rgba(0, 0, 0, .25); }
 .vval { position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%); padding: 3px 8px; border-radius: 7px; background: var(--ink); color: var(--panel); font-size: 12px; font-weight: 700; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .15s; font-variant-numeric: tabular-nums; }
 .lefty .vval { left: auto; right: calc(100% + 10px); }
