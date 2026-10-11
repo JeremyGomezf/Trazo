@@ -1,0 +1,136 @@
+# Compila Trazo en cada cambio a main:
+#  - Página web (GitHub Pages), instalable en el celular como app
+#  - APK de Android (Capacitor)
+#  - Instalador y versión portable para Windows, y AppImage para Linux (Electron)
+# y publica todo en la sección "Releases" del repositorio.
+name: Compilar Trazo
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Página web
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: www
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+  android:
+    name: APK de Android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Instalar dependencias
+        run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Crear proyecto Android
+        run: |
+          npx cap add android
+          npx capacitor-assets generate --android --assetPath assets
+          npx cap sync android
+      - name: Usar siempre la misma firma (para poder actualizar sin desinstalar)
+        run: |
+          mkdir -p ~/.android
+          cp build/debug.keystore ~/.android/debug.keystore
+      - name: Compilar APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+      - name: Renombrar APK
+        run: |
+          mkdir -p out
+          cp android/app/build/outputs/apk/debug/app-debug.apk out/Trazo.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: out/Trazo.apk
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx electron-builder --win nsis portable --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            dist/*.exe
+
+  linux:
+    name: Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx electron-builder --linux AppImage --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/*.AppImage
+
+  release:
+    name: Publicar descargas
+    needs: [android, windows, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: files
+          merge-multiple: true
+      - name: Listar archivos
+        run: ls -la files
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Trazo 1.0.${{ github.run_number }}
+          make_latest: true
+          body: |
+            Descargas de Trazo:
+            - **Trazo.apk**: Android. Ábrelo en el celular y permite "instalar apps de origen desconocido".
+            - **Trazo-Setup-…exe**: instalador para Windows.
+            - **Trazo-Portable-…exe**: Windows sin instalar.
+            - **Trazo-…AppImage**: Linux.
+            También puedes usarla en el navegador desde la página web del proyecto.
+          files: files/*

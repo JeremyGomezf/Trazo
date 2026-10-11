@@ -1,0 +1,10 @@
+{
+  "appId": "com.jeremygomez.trazo",
+  "appName": "Trazo",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#14171d",
+    "allowMixedContent": false,
+    "captureInput": true
+  }
+}

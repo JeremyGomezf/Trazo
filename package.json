@@ -1,0 +1,44 @@
+{
+  "name": "trazo",
+  "productName": "Trazo",
+  "version": "1.0.0",
+  "description": "App de dibujo con pinceles, capas, lápiz con presión, simetría y filtros.",
+  "author": "Jeremy Gomez <jeremygomezsf@gmail.com>",
+  "license": "MIT",
+  "private": true,
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "npx http-server www -p 8080 -c-1",
+    "desktop": "electron .",
+    "dist:win": "electron-builder --win nsis portable --publish never",
+    "dist:linux": "electron-builder --linux AppImage --publish never",
+    "dist:mac": "electron-builder --mac dmg --publish never",
+    "android:add": "cap add android",
+    "android:icons": "capacitor-assets generate --android --assetPath assets",
+    "android:sync": "cap sync android",
+    "android:open": "cap open android"
+  },
+  "devDependencies": {
+    "@capacitor/android": "8.5.2",
+    "@capacitor/assets": "3.0.5",
+    "@capacitor/cli": "8.5.2",
+    "@capacitor/core": "8.5.2",
+    "@capacitor/filesystem": "8.1.3",
+    "@capacitor/share": "8.0.2",
+    "electron": "44.4.5",
+    "electron-builder": "26.16.1"
+  },
+  "build": {
+    "appId": "com.jeremygomez.trazo",
+    "productName": "Trazo",
+    "copyright": "© 2026 Jeremy Gomez",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["electron/**/*", "www/**/*", "package.json"],
+    "fileAssociations": [{ "ext": "trazo", "name": "Proyecto de Trazo", "role": "Editor" }],
+    "win": { "target": ["nsis", "portable"], "icon": "build/icon.png", "artifactName": "Trazo-${version}-${arch}-${target}.${ext}" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "artifactName": "Trazo-Setup-${version}.${ext}" },
+    "portable": { "artifactName": "Trazo-Portable-${version}.${ext}" },
+    "linux": { "target": ["AppImage"], "category": "Graphics", "icon": "build/icon.png", "artifactName": "Trazo-${version}.${ext}" },
+    "mac": { "target": ["dmg"], "category": "public.app-category.graphics-design", "artifactName": "Trazo-${version}.${ext}" }
+  }
+}
