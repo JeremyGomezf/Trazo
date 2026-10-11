@@ -1,9 +1,9 @@
 {
   "name": "trazo",
   "productName": "Trazo",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "App de dibujo con pinceles, capas, lápiz con presión, simetría y filtros.",
-  "author": "Jeremy Gomez <jeremygomezsf@gmail.com>",
+  "author": "Jeremy Fernando Gomez Santistevan <jeremygomezsf@gmail.com>",
   "license": "MIT",
   "private": true,
   "main": "electron/main.js",
@@ -32,7 +32,7 @@
   "build": {
     "appId": "com.jeremygomez.trazo",
     "productName": "Trazo",
-    "copyright": "© 2026 Jeremy Gomez",
+    "copyright": "© 2026 Jeremy Fernando Gomez Santistevan",
     "directories": {
       "output": "dist",
       "buildResources": "build"

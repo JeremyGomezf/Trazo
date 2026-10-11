@@ -348,3 +348,6 @@ textarea.tin { resize: vertical; min-height: 76px; }
 .seg.wrap { flex-wrap: wrap; }
 .note.warn { color: var(--danger); font-weight: 600; }
 .presets .pshape { max-height: 44px; }
+
+.gcredit { max-width: 1200px; margin: 40px auto 0; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; text-align: center; }
+.credit { margin: 2px 0; font-weight: 700; }

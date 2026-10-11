@@ -322,7 +322,30 @@
   T.exportBlob = async function (kind, scale) {
     if (kind === 'project') return new Blob([T.projectJSON()], { type: 'application/json' });
     const c = T.composite(kind === 'png-t', scale || 1);
+    if (T.prefs.watermark !== false) T.drawWatermark(c);
     return kind === 'jpg' ? toBlob(c, 'image/jpeg', 0.92) : toBlob(c, 'image/png');
+  };
+  /* Marca de agua del autor en la esquina inferior derecha */
+  T.AUTHOR = 'Jeremy Fernando Gomez Santistevan';
+  T.drawWatermark = function (c) {
+    const x = c.getContext('2d'), m = Math.min(c.width, c.height);
+    const size = Math.max(9, Math.round(m * 0.022)), pad = Math.round(size * 0.9);
+    const txt = 'Trazo · ' + T.AUTHOR;
+    x.save();
+    x.font = '600 ' + size + 'px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+    x.textAlign = 'right';
+    x.textBaseline = 'bottom';
+    let w = x.measureText(txt).width;
+    if (w > c.width - pad * 2) { x.font = '600 ' + Math.max(7, Math.floor(size * (c.width - pad * 2) / w)) + 'px system-ui, sans-serif'; w = x.measureText(txt).width; }
+    x.globalAlpha = 0.62;
+    x.lineJoin = 'round';
+    x.lineWidth = Math.max(2, size * 0.22);
+    x.strokeStyle = 'rgba(0,0,0,0.55)';
+    x.strokeText(txt, c.width - pad, c.height - pad);
+    x.fillStyle = '#ffffff';
+    x.fillText(txt, c.width - pad, c.height - pad);
+    x.restore();
+    return c;
   };
   T.exportName = (kind) => T.safeName(D.name) + '-' + T.fileStamp() + (kind === 'project' ? '.trazo' : kind === 'jpg' ? '.jpg' : '.png');
 })();

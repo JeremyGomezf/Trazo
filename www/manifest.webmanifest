@@ -1,7 +1,7 @@
 {
   "name": "Trazo",
   "short_name": "Trazo",
-  "description": "App de dibujo con pinceles, capas, lápiz con presión, simetría y filtros.",
+  "description": "App de dibujo con pinceles, capas, lápiz con presión, simetría y filtros. Creada por Jeremy Fernando Gomez Santistevan.",
   "lang": "es",
   "start_url": "./",
   "scope": "./",

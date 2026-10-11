@@ -1,5 +1,7 @@
 # Trazo
 
+Creado por **Jeremy Fernando Gomez Santistevan**.
+
 App de dibujo inspirada en ibisPaint, hecha con HTML, CSS y JavaScript. Funciona en el navegador, como app instalable en el celular, como **APK de Android** y como **programa para Windows y Linux**.
 
 ## Descargas
@@ -82,3 +84,7 @@ build/          icono de escritorio y firma de Android
 ```
 
 `build/debug.keystore` es una firma de depuración: sirve para que el APK se pueda actualizar sin desinstalar. Para publicar en Google Play hay que crear una firma propia.
+
+## Créditos
+
+Trazo fue creado por **Jeremy Fernando Gomez Santistevan** (Guayaquil, Ecuador). Las imágenes exportadas llevan una marca de agua pequeña con su nombre, que se puede quitar en la ventana de Guardar.

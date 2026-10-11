@@ -660,8 +660,12 @@
     if (T.xf.active) T.xfCommit();
     let scale = 1;
     const img = T.el('img', { class: 'expimg', alt: 'Vista previa del dibujo' });
-    const prevC = T.composite(D.transparent, Math.min(1, 900 / Math.max(D.w, D.h)));
-    img.src = prevC.toDataURL('image/png');
+    const setPrev = () => {
+      const c = T.composite(D.transparent, Math.min(1, 900 / Math.max(D.w, D.h)));
+      if (P.watermark !== false) T.drawWatermark(c);
+      img.src = c.toDataURL('image/png');
+    };
+    setPrev();
     const sizeLbl = T.el('span', { class: 'note', text: D.w + ' × ' + D.h + ' px' });
     const scaleSeg = T.seg({
       label: 'Escala', value: '1', options: [['1', '1×'], ['2', '2×'], ['0.5', '½']],
@@ -678,9 +682,11 @@
       b.addEventListener('click', () => doIt(kind, share));
       return b;
     };
+    const wm = T.check({ label: 'Marca de agua (Trazo · ' + T.AUTHOR + ')', value: P.watermark !== false, onChange: (v) => { P.watermark = v; T.savePrefs(); setPrev(); } });
     const body = T.el('div', { class: 'stack' }, [
       img,
       T.el('div', { class: 'two' }, [scaleSeg, sizeLbl]),
+      wm,
       T.el('div', { class: 'expgrid' }, [
         btn('Imagen PNG', 'png', true), btn('PNG transparente', 'png-t'), btn('JPG', 'jpg'), btn('Proyecto con capas (.trazo)', 'project'),
         T.canShare() ? btn('Compartir…', 'png', false, true) : null
@@ -707,7 +713,9 @@
       T.check({ label: 'Mostrar el contorno del pincel', value: P.showCursor, onChange: (v) => { P.showCursor = v; T.savePrefs(); } }),
       T.check({ label: 'Modo zurdo (barras de tamaño a la derecha)', value: P.leftHand, onChange: (v) => { P.leftHand = v; T.savePrefs(); applyHand(); } }),
       T.seg({ label: 'Tema', value: P.theme, options: [['system', 'Sistema'], ['light', 'Claro'], ['dark', 'Oscuro']], onChange: (v) => { P.theme = v; T.savePrefs(); applyTheme(); } }),
-      T.el('p', { class: 'note', text: 'Trazo 1.0 · ' + ({ android: 'Android', desktop: 'Escritorio', web: 'Web' }[T.platform]) + ' · Atajos: B pincel, E borrador, S difuminar, G relleno, I cuentagotas, L selección, V transformar, T texto, [ ] tamaño, X intercambiar colores, M espejo, Espacio mover vista.' })
+      T.el('h3', { text: 'Acerca de' }),
+      T.el('p', { class: 'credit', text: 'Trazo, creado por ' + T.AUTHOR + '.' }),
+      T.el('p', { class: 'note', text: 'Versión 1.1 · ' + ({ android: 'Android', desktop: 'Escritorio', web: 'Web' }[T.platform]) + ' · Atajos: B pincel, E borrador, S difuminar, G relleno, I cuentagotas, L selección, V transformar, T texto, [ ] tamaño, X intercambiar colores, M espejo, Espacio mover vista.' })
     ]);
     T.dialog({ title: 'Ajustes', body, wide: true, actions: [{ label: 'Listo', primary: true }] });
     setupPenTest(pad, read);
