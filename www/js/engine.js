@@ -22,7 +22,7 @@
 
   T.newLayer = function (name) {
     const c = T.mkCanvas(D.w, D.h);
-    return { id: ++lid, name: name || 'Capa ' + ++D.seq, canvas: c, ctx: c.getContext('2d'), visible: true, opacity: 1, blend: 'normal', clip: false, lockAlpha: false, rev: 1 };
+    return { id: ++lid, name: name || 'Capa ' + ++D.seq, canvas: c, ctx: c.getContext('2d'), visible: true, opacity: 1, blend: 'normal', clip: false, lockAlpha: false, text: null, rev: 1 };
   };
   T.active = () => D.layers.find((l) => l.id === D.activeId) || D.layers[D.layers.length - 1];
   T.layerById = (id) => D.layers.find((l) => l.id === id);
@@ -53,9 +53,9 @@
   };
 
   /* ---------- Estado temporal (trazo en curso, vista previa de filtro, transformación) ---------- */
-  const live = (T.live = { layerId: null, stroke: null, strokeAlpha: 1, strokeMode: 'over', preview: null, float: null, floatM: null, token: 0 });
+  const live = (T.live = { layerId: null, stroke: null, strokeAlpha: 1, strokeMode: 'over', texture: null, preview: null, float: null, floatM: null, token: 0 });
   T.setLive = function (o) {
-    Object.assign(live, { layerId: null, stroke: null, strokeAlpha: 1, strokeMode: 'over', preview: null, float: null, floatM: null }, o);
+    Object.assign(live, { layerId: null, stroke: null, strokeAlpha: 1, strokeMode: 'over', texture: null, preview: null, float: null, floatM: null }, o);
     live.token++;
     T.dirty();
   };
@@ -74,18 +74,21 @@
     x.drawImage(live.preview || L.canvas, 0, 0);
     if (live.stroke) {
       let s = live.stroke;
-      if (SEL.active) {
+      if (SEL.active || live.texture) {
         const d = S.dx;
         T.resetCtx(d);
         d.clearRect(0, 0, D.w, D.h);
         d.drawImage(s, 0, 0);
-        d.globalCompositeOperation = 'destination-in';
-        d.drawImage(SEL.mask, 0, 0);
-        d.globalCompositeOperation = 'source-over';
+        if (live.texture) T.applyTexture(d, live.texture, D.w, D.h);
+        if (SEL.active) {
+          d.globalCompositeOperation = 'destination-in';
+          d.drawImage(SEL.mask, 0, 0);
+          d.globalCompositeOperation = 'source-over';
+        }
         s = S.d;
       }
       x.globalAlpha = live.strokeAlpha;
-      x.globalCompositeOperation = live.strokeMode === 'erase' ? 'destination-out' : L.lockAlpha ? 'source-atop' : 'source-over';
+      x.globalCompositeOperation = live.strokeMode === 'erase' ? 'destination-out' : live.strokeMode === 'add' ? 'lighter' : L.lockAlpha ? 'source-atop' : 'source-over';
       x.drawImage(s, 0, 0);
     }
     if (live.float) {
@@ -242,11 +245,14 @@
     S.snapx.clearRect(0, 0, D.w, D.h);
     S.snapx.drawImage(L.canvas, 0, 0);
   };
-  T.endEdit = function (L, b, extra) {
+  T.endEdit = function (L, b, extra, keepText) {
     if (!b) return;
     const op = { t: 'px', id: L.id, x: b.x, y: b.y, w: b.w, h: b.h, before: crop(S.snap, b), after: crop(L.canvas, b) };
     L.rev++;
-    T.pushOp(extra ? { t: 'multi', ops: [op].concat(extra) } : op);
+    extra = extra || [];
+    // pintar sobre una capa de texto la convierte en imagen
+    if (L.text && !keepText) { extra.push({ t: 'props', id: L.id, before: { text: L.text }, after: { text: null } }); L.text = null; T.emit('layers'); }
+    T.pushOp(extra.length ? { t: 'multi', ops: [op].concat(extra) } : op);
     T.emit('layerpx', L);
     T.dirty();
   };
@@ -261,7 +267,7 @@
     let bytes = 0;
     const layers = D.layers.map((L) => {
       bytes += D.w * D.h * 4;
-      return { id: L.id, name: L.name, visible: L.visible, opacity: L.opacity, blend: L.blend, clip: L.clip, lockAlpha: L.lockAlpha, canvas: T.cloneCanvas(L.canvas) };
+      return { id: L.id, name: L.name, visible: L.visible, opacity: L.opacity, blend: L.blend, clip: L.clip, lockAlpha: L.lockAlpha, text: L.text, canvas: T.cloneCanvas(L.canvas) };
     });
     return { w: D.w, h: D.h, activeId: D.activeId, layers, bytes };
   };
@@ -270,7 +276,7 @@
     D.w = s.w; D.h = s.h;
     D.layers = s.layers.map((o) => {
       const c = T.cloneCanvas(o.canvas);
-      return { id: o.id, name: o.name, visible: o.visible, opacity: o.opacity, blend: o.blend, clip: o.clip, lockAlpha: o.lockAlpha, canvas: c, ctx: c.getContext('2d'), rev: Date.now() };
+      return { id: o.id, name: o.name, visible: o.visible, opacity: o.opacity, blend: o.blend, clip: o.clip, lockAlpha: o.lockAlpha, text: o.text || null, canvas: c, ctx: c.getContext('2d'), rev: Date.now() };
     });
     D.activeId = s.activeId;
     if (resized) { setupScratch(); T.emit('resized'); }
@@ -355,7 +361,7 @@
   T.duplicateLayer = function (L) {
     const N = T.newLayer(L.name + ' (copia)');
     N.ctx.drawImage(L.canvas, 0, 0);
-    Object.assign(N, { opacity: L.opacity, blend: L.blend, clip: L.clip, lockAlpha: L.lockAlpha, visible: L.visible });
+    Object.assign(N, { opacity: L.opacity, blend: L.blend, clip: L.clip, lockAlpha: L.lockAlpha, visible: L.visible, text: L.text ? JSON.parse(JSON.stringify(L.text)) : null });
     const idx = T.layerIndex(L) + 1;
     insertLayerRaw(N, idx);
     T.pushOp({ t: 'add', layer: N, index: idx });
@@ -442,7 +448,7 @@
         else if (kind === 'cw') { x.translate(nw, 0); x.rotate(Math.PI / 2); }
         else if (kind === 'ccw') { x.translate(0, nh); x.rotate(-Math.PI / 2); }
         x.drawImage(L.canvas, 0, 0);
-        L.canvas = c; L.ctx = x; T.resetCtx(x); L.rev++;
+        L.canvas = c; L.ctx = x; T.resetCtx(x); L.rev++; L.text = null;
       });
       if (rot) { D.w = nw; D.h = nh; setupScratch(); T.emit('resized'); }
     });
@@ -458,7 +464,7 @@
         x.imageSmoothingQuality = 'high';
         if (mode === 'scale') x.drawImage(L.canvas, 0, 0, nw, nh);
         else x.drawImage(L.canvas, Math.round((nw - w) * ax), Math.round((nh - h) * ay));
-        L.canvas = c; L.ctx = x; L.rev++;
+        L.canvas = c; L.ctx = x; L.rev++; L.text = null;
       });
       D.w = Math.round(nw); D.h = Math.round(nh);
       setupScratch();
@@ -473,7 +479,7 @@
     T.docOp(() => {
       D.layers.forEach((L) => {
         const c = crop(L.canvas, b);
-        L.canvas = c; L.ctx = c.getContext('2d'); L.rev++;
+        L.canvas = c; L.ctx = c.getContext('2d'); L.rev++; L.text = null;
       });
       D.w = b.w; D.h = b.h;
       setupScratch();
@@ -614,9 +620,11 @@
   };
 
   /* Aplica un lienzo de trazo a la capa (pintar o borrar) y registra */
-  T.commitStroke = function (L, stroke, alpha, mode, b) {
+  T.commitStroke = function (L, stroke, alpha, mode, b, texture) {
     if (!b) { T.clearLive(); return; }
     const sx = stroke.getContext('2d');
+    T.resetCtx(sx);
+    if (texture) T.applyTexture(sx, texture, D.w, D.h);
     if (SEL.active) {
       sx.globalCompositeOperation = 'destination-in';
       sx.drawImage(SEL.mask, 0, 0);
@@ -625,7 +633,7 @@
     const x = L.ctx;
     T.resetCtx(x);
     x.globalAlpha = alpha;
-    x.globalCompositeOperation = mode === 'erase' ? 'destination-out' : L.lockAlpha ? 'source-atop' : 'source-over';
+    x.globalCompositeOperation = mode === 'erase' ? 'destination-out' : mode === 'add' ? 'lighter' : L.lockAlpha ? 'source-atop' : 'source-over';
     x.drawImage(stroke, b.x, b.y, b.w, b.h, b.x, b.y, b.w, b.h);
     T.resetCtx(x);
     T.resetCtx(sx);

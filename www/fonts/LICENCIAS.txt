@@ -1,0 +1,22 @@
+Amatic SC (amatic-sc): "license": "OFL-1.1" — Google Fonts, distribuida vía @fontsource
+Anton (anton): "license": "OFL-1.1" — Google Fonts, distribuida vía @fontsource
+Bangers (bangers): "license": "OFL-1.1" — Google Fonts, distribuida vía @fontsource
+Bebas Neue (bebas-neue): "license": "OFL-1.1" — Google Fonts, distribuida vía @fontsource
+Caveat (caveat): "license": "OFL-1.1" — Google Fonts, distribuida vía @fontsource
+Cinzel (cinzel): "license": "OFL-1.1" — Google Fonts, distribuida vía @fontsource
+Comic Neue (comic-neue): "license": "OFL-1.1" — Google Fonts, distribuida vía @fontsource
+Creepster (creepster): "license": "OFL-1.1" — Google Fonts, distribuida vía @fontsource
+Dancing Script (dancing-script): "license": "OFL-1.1" — Google Fonts, distribuida vía @fontsource
+Fredoka (fredoka): "license": "OFL-1.1" — Google Fonts, distribuida vía @fontsource
+Indie Flower (indie-flower): "license": "OFL-1.1" — Google Fonts, distribuida vía @fontsource
+Kalam (kalam): "license": "OFL-1.1" — Google Fonts, distribuida vía @fontsource
+Lobster (lobster): "license": "OFL-1.1" — Google Fonts, distribuida vía @fontsource
+Luckiest Guy (luckiest-guy): "license": "Apache-2.0" — Google Fonts, distribuida vía @fontsource
+Orbitron (orbitron): "license": "OFL-1.1" — Google Fonts, distribuida vía @fontsource
+Pacifico (pacifico): "license": "OFL-1.1" — Google Fonts, distribuida vía @fontsource
+Patrick Hand (patrick-hand): "license": "OFL-1.1" — Google Fonts, distribuida vía @fontsource
+Permanent Marker (permanent-marker): "license": "Apache-2.0" — Google Fonts, distribuida vía @fontsource
+Playfair Display (playfair-display): "license": "OFL-1.1" — Google Fonts, distribuida vía @fontsource
+Press Start 2P (press-start-2p): "license": "OFL-1.1" — Google Fonts, distribuida vía @fontsource
+Righteous (righteous): "license": "OFL-1.1" — Google Fonts, distribuida vía @fontsource
+Special Elite (special-elite): "license": "Apache-2.0" — Google Fonts, distribuida vía @fontsource

@@ -418,6 +418,11 @@
       T.slider({ label: 'Presión → opacidad', min: 0, max: 100, value: Math.round(b.alphaP * 100), unit: '%', onInput: (v) => upd('alphaP')(v / 100) })
     ];
     if (b.flowMode === 'build') rows.push(T.slider({ label: 'Flujo', min: 1, max: 50, value: Math.round((b.flow || 0.07) * 100), unit: '%', onInput: (v) => upd('flow')(v / 100) }));
+    if (b.kind === 'mix') rows.push(T.slider({ label: 'Mezcla con lo pintado', min: 0, max: 100, value: Math.round((b.mix == null ? 0.55 : b.mix) * 100), unit: '%', onInput: (v) => upd('mix')(v / 100) }));
+    if (b.roundness) {
+      rows.push(T.slider({ label: 'Forma de la punta', min: 10, max: 100, value: Math.round(b.roundness * 100), unit: '%', onInput: (v) => upd('roundness')(v / 100) }));
+      if (!b.follow) rows.push(T.slider({ label: 'Ángulo de la punta', min: 0, max: 180, value: b.angle || 0, unit: '°', onInput: upd('angle') }));
+    }
     rows.push(T.check({ label: 'Afinar inicio y final (sin lápiz con presión)', value: !!b.taper, onChange: upd('taper') }));
     const reset = T.el('button', { type: 'button', class: 'btn ghost', text: 'Restablecer este pincel' });
     reset.addEventListener('click', () => { T.resetBrush(b); renderBrushPanel(); refreshQuick(); });
@@ -476,10 +481,10 @@
       thumbs.set(L.id, th);
       const meta = [T.blendName(L.blend), Math.round(L.opacity * 100) + '%'];
       const info = T.el('div', { class: 'linfo' }, [T.el('span', { class: 'lname', text: L.name }), T.el('span', { class: 'lmeta', text: meta.join(' · ') })]);
-      const flags = T.el('span', { class: 'lflags', html: (L.lockAlpha ? T.icon('lock') : '') });
+      const flags = T.el('span', { class: 'lflags', html: (L.text ? T.icon('text') : '') + (L.lockAlpha ? T.icon('lock') : '') });
       const li = T.el('li', { class: 'lrow' + (L.id === A.id ? ' on' : '') + (L.clip ? ' clipped' : '') + (L.visible ? '' : ' hiddenL'), tabindex: '0' }, [L.clip ? T.el('span', { class: 'lclip', html: T.icon('clip') }) : null, eye, th, info, flags]);
       li.addEventListener('click', () => { if (D.activeId !== L.id) { D.activeId = L.id; renderLayers(); T.emit('active'); } });
-      li.addEventListener('dblclick', () => renameLayer(L));
+      li.addEventListener('dblclick', () => (L.text ? T.textDialog({ x: L.text.cx, y: L.text.cy }, L) : renameLayer(L)));
       li.addEventListener('keydown', (e) => { if (e.key === 'Enter') li.click(); });
       ul.append(li);
       drawThumb(L);
@@ -511,6 +516,7 @@
   }
   function layerMenu(anchor, L) {
     T.menu(anchor, [
+      L.text ? { label: 'Editar texto', icon: 'text', action: () => T.textDialog({ x: L.text.cx, y: L.text.cy }, L) } : null,
       { label: 'Renombrar', icon: 'text', action: () => renameLayer(L) },
       { label: 'Rellenar con el color actual', icon: 'bucket', action: () => T.fillLayer(L, P.color) },
       { label: 'Seleccionar contenido', icon: 'lasso', action: () => T.selFromLayer(L) },
@@ -556,6 +562,7 @@
       { label: 'Fondo transparente', checked: D.transparent, action: () => T.setDocProps({ transparent: !D.transparent }) },
       { sep: true },
       { label: 'Importar imagen como capa…', icon: 'image', action: () => pickFile('image/*', (f) => importLayerFile(f)) },
+      { label: 'Foto como capa (cámara o galería)…', icon: 'camera', action: () => setTimeout(() => photoMenu(anchor, 'layer'), 0) },
       { label: 'Renombrar dibujo…', icon: 'text', action: renameDoc }
     ]);
   }
@@ -765,7 +772,7 @@
       if (/\.(trazo|json)$/i.test(f.name) || f.type === 'application/json') { await T.importProject(JSON.parse(await f.text())); T.toast('Proyecto abierto'); return; }
       if (f.type.indexOf('image/') === 0 || /\.(png|jpe?g|webp|gif|bmp)$/i.test(f.name)) {
         const im = await fileToImage(f);
-        const k = Math.min(1, 4096 / Math.max(im.naturalWidth, im.naturalHeight));
+        const k = Math.min(1, T.maxCanvas() / Math.max(im.naturalWidth, im.naturalHeight));
         await T.newArtwork(Math.round(im.naturalWidth * k), Math.round(im.naturalHeight * k), { image: im, name: f.name.replace(/\.[^.]+$/, '').slice(0, 40) });
         return;
       }
@@ -817,38 +824,86 @@
   T.renderGallery = renderGallery;
 
   function newDialog() {
-    const PRE = [['Cuadrado', 1500, 1500], ['Vertical', 1200, 1800], ['Horizontal', 1920, 1080], ['Historia', 1080, 1920], ['Ícono', 512, 512], ['Pixel art', 64, 64]];
-    const scr = [Math.round(screen.width * (window.devicePixelRatio || 1)), Math.round(screen.height * (window.devicePixelRatio || 1))];
-    PRE.push(['Pantalla', Math.min(4096, Math.max(scr[0], scr[1])), Math.min(4096, Math.min(scr[0], scr[1]))]);
-    const w = T.el('input', { type: 'number', class: 'tin num', id: 'nW', min: '16', max: '4096', value: 1500, 'aria-label': 'Ancho' });
-    const h = T.el('input', { type: 'number', class: 'tin num', id: 'nH', min: '16', max: '4096', value: 1500, 'aria-label': 'Alto' });
-    let transparent = false;
+    const max = T.maxCanvas(), dpr = window.devicePixelRatio || 1;
+    let sw = Math.round(screen.width * dpr), sh = Math.round(screen.height * dpr);
+    if (sw > sh) [sw, sh] = [sh, sw];
+    const fitMax = (w, h) => { const k = Math.min(1, max / Math.max(w, h)); return [Math.round(w * k), Math.round(h * k)]; };
+    const mmPx = (mm, dpi) => Math.round((mm / 25.4) * dpi);
+    let dpi = 300;
+    const CATS = {
+      screen: [['Pantalla vertical', ...fitMax(sw, sh)], ['Pantalla horizontal', ...fitMax(sh, sw)], ['Cuadrado', 1500, 1500], ['Full HD', 1920, 1080], ['2K', 2560, 1440], ['4K', 3840, 2160]],
+      social: [['Post de Instagram', 1080, 1080], ['Instagram vertical', 1080, 1350], ['Historia / TikTok', 1080, 1920], ['Miniatura de YouTube', 1280, 720], ['Banner de YouTube', 2560, 1440], ['Portada de X', 1500, 500], ['Foto de perfil', 800, 800], ['Fondo de celular', 1440, 3200]],
+      paper: [['A4', 210, 297, 'mm'], ['A5', 148, 210, 'mm'], ['A3', 297, 420, 'mm'], ['B5', 182, 257, 'mm'], ['Carta', 216, 279, 'mm'], ['Postal', 100, 148, 'mm'], ['Tarjeta', 89, 51, 'mm'], ['Manga B4', 257, 364, 'mm']],
+      pixel: [['16 × 16', 16, 16], ['32 × 32', 32, 32], ['64 × 64', 64, 64], ['128 × 128', 128, 128], ['256 × 256', 256, 256], ['Game Boy', 160, 144], ['Retro 320', 320, 180]]
+    };
+    const w = T.el('input', { type: 'number', class: 'tin num', id: 'nW', min: '16', max: String(max), value: CATS.screen[0][1], 'aria-label': 'Ancho en píxeles' });
+    const h = T.el('input', { type: 'number', class: 'tin num', id: 'nH', min: '16', max: String(max), value: CATS.screen[0][2], 'aria-label': 'Alto en píxeles' });
+    const info = T.el('p', { class: 'note', id: 'nInfo' });
     const grid = T.el('div', { class: 'presets' });
-    PRE.forEach((p, i) => {
-      const b = T.el('button', { type: 'button', class: 'preset', 'aria-pressed': i === 0 ? 'true' : 'false' }, [
-        T.el('span', { class: 'pshape', style: 'aspect-ratio:' + p[1] + '/' + p[2] }),
-        T.el('span', { class: 'pname', text: p[0] }), T.el('span', { class: 'pdim', text: p[1] + '×' + p[2] })
-      ]);
-      b.addEventListener('click', () => {
-        T.$$('.preset', grid).forEach((x) => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
-        w.value = p[1]; h.value = p[2];
+    const dpiSeg = T.seg({ label: 'Resolución', value: '300', options: [['150', '150 dpi'], ['300', '300 dpi'], ['350', '350 dpi']], onChange: (v) => { dpi = +v; renderCat(); } });
+    let cat = 'screen', bg = 'white';
+    const updInfo = () => {
+      const W = +w.value || 0, H = +h.value || 0, mb = Math.round((W * H * 4) / 1e6);
+      info.textContent = W + ' × ' + H + ' px · unos ' + mb + ' MB de memoria por capa · máximo en este equipo: ' + max + ' px';
+      info.classList.toggle('warn', Math.max(W, H) > max);
+    };
+    const pick = (b, W, H) => {
+      T.$$('.preset', grid).forEach((x) => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+      [W, H] = fitMax(W, H);
+      w.value = W; h.value = H; updInfo();
+    };
+    function renderCat() {
+      grid.innerHTML = '';
+      dpiSeg.hidden = cat !== 'paper';
+      (CATS[cat] || []).forEach((p, i) => {
+        const W = p[3] === 'mm' ? mmPx(p[1], dpi) : p[1], H = p[3] === 'mm' ? mmPx(p[2], dpi) : p[2];
+        const b = T.el('button', { type: 'button', class: 'preset', 'aria-pressed': 'false' }, [
+          T.el('span', { class: 'pshape', style: 'aspect-ratio:' + W + '/' + H + (W >= H ? ';width:58px;height:auto' : '') }),
+          T.el('span', { class: 'pname', text: p[0] }),
+          T.el('span', { class: 'pdim', text: p[3] === 'mm' ? p[1] + '×' + p[2] + ' mm' : W + '×' + H })
+        ]);
+        b.addEventListener('click', () => pick(b, W, H));
+        grid.append(b);
+        if (i === 0) pick(b, W, H);
       });
-      grid.append(b);
-    });
-    const warn = T.el('p', { class: 'note', text: 'Los lienzos muy grandes usan más memoria. En celulares, 3000 px o menos va mejor.' });
+    }
+    const catSeg = T.seg({ label: 'Tipo de lienzo', value: cat, options: [['screen', 'Pantalla'], ['social', 'Redes'], ['paper', 'Papel'], ['pixel', 'Pixel art']], onChange: (v) => { cat = v; renderCat(); } });
+    catSeg.classList.add('full', 'wrap');
+    const rotBtn = T.el('button', { type: 'button', class: 'ib sm', title: 'Girar (vertical/horizontal)', 'aria-label': 'Girar orientación', html: T.icon('rotate') });
+    rotBtn.addEventListener('click', () => { const a = w.value; w.value = h.value; h.value = a; updInfo(); });
+    w.addEventListener('input', updInfo);
+    h.addEventListener('input', updInfo);
     const body = T.el('div', { class: 'stack' }, [
-      grid,
-      T.el('div', { class: 'dims' }, [w, T.el('span', { text: '×' }), h, T.el('span', { text: 'px' })]),
-      T.check({ label: 'Fondo transparente', value: false, onChange: (v) => (transparent = v) }),
-      warn
+      catSeg, dpiSeg, grid,
+      T.el('h3', { text: 'Tamaño' }),
+      T.el('div', { class: 'dims' }, [w, T.el('span', { text: '×' }), h, T.el('span', { text: 'px' }), rotBtn]),
+      info,
+      T.el('h3', { text: 'Fondo' }),
+      T.seg({ label: 'Fondo', value: bg, options: [['white', 'Blanco'], ['transparent', 'Transparente'], ['color', 'Color actual']], onChange: (v) => (bg = v) })
     ]);
+    renderCat();
     T.dialog({
       title: 'Nuevo dibujo', body, wide: true, actions: [
         { label: 'Cancelar' },
-        { label: 'Crear', primary: true, action: () => { T.newArtwork(T.clamp(Math.round(+w.value || 1500), 16, 4096), T.clamp(Math.round(+h.value || 1500), 16, 4096), { transparent }); } }
+        {
+          label: 'Crear', primary: true, action: () => {
+            let W = T.clamp(Math.round(+w.value || 1500), 16, 16384), H = T.clamp(Math.round(+h.value || 1500), 16, 16384);
+            if (Math.max(W, H) > max) { [W, H] = fitMax(W, H); T.toast('Se ajustó a ' + W + '×' + H + ' para que tu equipo no se quede sin memoria', 4000); }
+            T.newArtwork(W, H, { transparent: bg === 'transparent', bg: bg === 'color' ? P.color : '#ffffff' });
+          }
+        }
       ]
     });
   }
+  function photoMenu(anchor, target) {
+    T.menu(anchor, [
+      { label: 'Tomar foto', icon: 'camera', action: () => (target === 'layer' ? T.photoToLayer('CAMERA') : T.photoToArtwork('CAMERA')) },
+      { label: 'Elegir de la galería', icon: 'image', action: () => (target === 'layer' ? T.photoToLayer('PHOTOS') : T.photoToArtwork('PHOTOS')) },
+      target === 'layer' ? null : { sep: true },
+      target === 'layer' ? null : { label: 'Foto de un boceto → líneas', icon: 'pen', hint: 'Extraer línea', action: () => T.photoToArtwork('PROMPT', true) }
+    ]);
+  }
+  T.photoMenu = photoMenu;
   T.newDialog = newDialog;
 
   /* ---------- Cambiar entre galería y editor ---------- */
@@ -937,6 +992,7 @@
     $('#gNew').addEventListener('click', newDialog);
     $('#gNew2').addEventListener('click', newDialog);
     $('#gImport').addEventListener('click', () => pickFile('', T.importAnyFile));
+    $('#gCamera').addEventListener('click', (e) => photoMenu(e.currentTarget));
     setTab(T.isNarrow() && P.panelTab === 'color' ? 'color' : P.panelTab === 'color' ? 'brush' : P.panelTab || 'brush');
     window.addEventListener('resize', T.debounce(() => { lastHue = -1; syncColorUI(); }, 150));
   };

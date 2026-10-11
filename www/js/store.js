@@ -81,7 +81,7 @@
       for (const L of D.layers) {
         let e = blobCache.get(L.id);
         if (!e || e.rev !== L.rev) { e = { rev: L.rev, blob: await toBlob(L.canvas) }; blobCache.set(L.id, e); }
-        layers.push({ name: L.name, visible: L.visible, opacity: L.opacity, blend: L.blend, clip: L.clip, lockAlpha: L.lockAlpha, png: e.blob });
+        layers.push({ name: L.name, visible: L.visible, opacity: L.opacity, blend: L.blend, clip: L.clip, lockAlpha: L.lockAlpha, text: L.text || null, png: e.blob });
       }
       const k = Math.min(1, 420 / Math.max(D.w, D.h));
       const thumb = await toBlob(T.composite(false, k), 'image/jpeg', 0.86);
@@ -120,7 +120,8 @@
     T.setupDoc(meta.w, meta.h, { id, name: meta.name, bg: data.bg, transparent: data.transparent, created: meta.created });
     for (const l of data.layers) {
       const L = T.newLayer(l.name);
-      Object.assign(L, { visible: l.visible !== false, opacity: l.opacity == null ? 1 : l.opacity, blend: l.blend || 'normal', clip: !!l.clip, lockAlpha: !!l.lockAlpha });
+      Object.assign(L, { visible: l.visible !== false, opacity: l.opacity == null ? 1 : l.opacity, blend: l.blend || 'normal', clip: !!l.clip, lockAlpha: !!l.lockAlpha, text: l.text || null });
+      if (l.text) T.loadFont(l.text.font, 40);
       if (l.png) { const im = await blobToCanvasImage(l.png); L.ctx.drawImage(im, 0, 0); blobCache.set(L.id, { rev: L.rev, blob: l.png }); }
       D.layers.push(L);
     }
@@ -136,10 +137,18 @@
     resetEditorState();
     T.setupDoc(w, h, { id: T.newId(), name: o.name || 'Dibujo ' + new Date().toLocaleDateString('es-EC', { day: 'numeric', month: 'short' }), bg: o.bg || '#ffffff', transparent: !!o.transparent });
     if (o.image) {
-      const base = T.newLayer('Imagen');
+      const base = T.newLayer(o.lineart ? 'Foto original' : 'Imagen');
       base.ctx.imageSmoothingQuality = 'high';
       base.ctx.drawImage(o.image, 0, 0, w, h);
       D.layers.push(base);
+      if (o.lineart) {
+        // como "importar dibujo" de ibisPaint: convierte la foto del boceto en líneas sobre transparente
+        const f = T.FILTERS.find((x) => x.id === 'lineart');
+        const ln = T.newLayer('Líneas');
+        ln.ctx.drawImage(f.run(base.canvas, { s: 55, keep: false }, {}), 0, 0);
+        base.visible = false;
+        D.layers.push(ln);
+      }
     }
     const L = T.newLayer();
     D.layers.push(L);
@@ -173,7 +182,7 @@
   T.projectJSON = function () {
     return JSON.stringify({
       format: 'trazo', v: 2, name: D.name, w: D.w, h: D.h, bg: D.bg, transparent: D.transparent, active: T.layerIndex(T.active()),
-      layers: D.layers.map((L) => ({ name: L.name, visible: L.visible, opacity: L.opacity, blend: L.blend, clip: L.clip, lockAlpha: L.lockAlpha, data: L.canvas.toDataURL('image/png') }))
+      layers: D.layers.map((L) => ({ name: L.name, visible: L.visible, opacity: L.opacity, blend: L.blend, clip: L.clip, lockAlpha: L.lockAlpha, text: L.text || null, data: L.canvas.toDataURL('image/png') }))
     });
   };
   T.importProject = async function (obj) {
@@ -183,7 +192,7 @@
     T.setupDoc(w, h, { id: T.newId(), name: String(obj.name || 'Proyecto importado').slice(0, 60), bg: obj.bg || '#ffffff', transparent: !!obj.transparent });
     for (const l of obj.layers.slice(0, 100)) {
       const L = T.newLayer(String(l.name || '').slice(0, 60) || undefined);
-      Object.assign(L, { visible: l.visible !== false, opacity: typeof l.opacity === 'number' ? T.clamp(l.opacity, 0, 1) : 1, blend: l.blend || 'normal', clip: !!l.clip, lockAlpha: !!l.lockAlpha });
+      Object.assign(L, { visible: l.visible !== false, opacity: typeof l.opacity === 'number' ? T.clamp(l.opacity, 0, 1) : 1, blend: l.blend || 'normal', clip: !!l.clip, lockAlpha: !!l.lockAlpha, text: l.text && typeof l.text === 'object' ? l.text : null });
       if (typeof l.data === 'string' && l.data.indexOf('data:image/') === 0) L.ctx.drawImage(await T.loadImage(l.data), 0, 0);
       D.layers.push(L);
     }
@@ -262,6 +271,53 @@
     return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes());
   };
   T.safeName = (s) => (s || 'trazo').replace(/[\\/:*?"<>|]+/g, '').trim().slice(0, 40) || 'trazo';
+
+  /* ---------- Cámara y galería de fotos ---------- */
+  T.getPhoto = async function (source) {
+    const cam = capPlugin('Camera');
+    if (T.platform === 'android' && cam) {
+      try {
+        const r = await cam.getPhoto({
+          resultType: 'dataUrl', source: source || 'PROMPT', quality: 92, correctOrientation: true, width: 4096,
+          promptLabelHeader: 'Foto', promptLabelPhoto: 'Elegir de la galería', promptLabelPicture: 'Tomar foto', promptLabelCancel: 'Cancelar'
+        });
+        return await T.loadImage(r.dataUrl);
+      } catch (e) {
+        if (!/cancel/i.test(String(e && e.message))) T.toast('No se pudo abrir la cámara: ' + (e && e.message ? e.message : 'error'));
+        return null;
+      }
+    }
+    // navegador: en celulares, capture abre la cámara
+    return new Promise((res) => {
+      const inp = T.el('input', { type: 'file', accept: 'image/*' });
+      if (source === 'CAMERA') inp.setAttribute('capture', 'environment');
+      inp.onchange = async () => {
+        const f = inp.files && inp.files[0];
+        if (!f) return res(null);
+        const u = URL.createObjectURL(f);
+        try { res(await T.loadImage(u)); } catch (e) { T.toast('No se pudo abrir esa imagen'); res(null); }
+        setTimeout(() => URL.revokeObjectURL(u), 3000);
+      };
+      inp.click();
+    });
+  };
+  T.photoToArtwork = async function (source, lineart) {
+    const im = await T.getPhoto(source);
+    if (!im) return;
+    const iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height;
+    const k = Math.min(1, T.maxCanvas() / Math.max(iw, ih));
+    await T.newArtwork(Math.round(iw * k), Math.round(ih * k), { image: im, lineart, name: lineart ? 'Boceto ' + new Date().toLocaleDateString('es-EC', { day: 'numeric', month: 'short' }) : undefined });
+    if (lineart) T.toast('Listo: la foto quedó oculta y las líneas en una capa aparte');
+  };
+  T.photoToLayer = async function (source) {
+    const im = await T.getPhoto(source);
+    if (im) T.importAsLayer(im, 'Foto');
+  };
+  /* Tamaño máximo del lienzo según la memoria del equipo */
+  T.maxCanvas = function () {
+    const mem = navigator.deviceMemory || (T.platform === 'android' ? 4 : 8);
+    return T.platform === 'android' || /Mobile/.test(navigator.userAgent) ? (mem >= 6 ? 4096 : 3072) : mem >= 8 ? 8192 : 6000;
+  };
 
   T.exportBlob = async function (kind, scale) {
     if (kind === 'project') return new Blob([T.projectJSON()], { type: 'application/json' });

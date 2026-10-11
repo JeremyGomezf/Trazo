@@ -1,6 +1,6 @@
 /* Trazo — funciona sin conexión: guarda la app en caché y la actualiza en segundo plano */
-const CACHE = 'trazo-v3';
-const FILES = ['./', 'index.html', 'css/app.css', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png',
+const CACHE = 'trazo-v4';
+const FILES = ['./', 'index.html', 'css/app.css', 'css/fonts.css', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png',
   'js/core.js', 'js/engine.js', 'js/brush.js', 'js/tools.js', 'js/filters.js', 'js/store.js', 'js/ui.js', 'js/input.js', 'js/app.js'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {

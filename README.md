@@ -17,13 +17,19 @@ La versión web queda en GitHub Pages: `https://jeremygomezf.github.io/Trazo/`. 
 
 ## Qué tiene
 
-**Pinceles:** lápiz con grano, pluma, pluma G, rotulador, marcador, pincel suave, aerógrafo, acuarela, carboncillo, puntos y pixel. Cada uno con tamaño, opacidad, estabilizador, dureza, espaciado, presión → tamaño, presión → opacidad y afinado de extremos. Borradores (duro, suave, lápiz, pixel) y difuminar.
+**Pinceles (20):** lápiz, pluma, pluma G, rotulador, caligrafía, marcador, pincel suave, pincel plano, óleo que mezcla colores, pintura en lienzo, aerógrafo, spray, acuarela, crayón, tiza, carboncillo, pluma de brillo, destellos, puntos y pixel. Cada uno con tamaño, opacidad, estabilizador, dureza, espaciado, presión → tamaño, presión → opacidad, afinado de extremos, y forma y ángulo de punta cuando aplica. Borradores (duro, suave, lápiz, pixel), y difuminar, arrastrar color, desenfocar y mezclar colores.
 
 **Lápiz óptico:** presión real (S Pen, Wacom, Surface, lápices USI), curva de presión ajustable, modo "solo lápiz" con rechazo de palma, la goma del lápiz borra y el botón lateral toma color. En Ajustes hay un recuadro para probar el lápiz y ver la presión y la inclinación.
 
 **Capas:** ilimitadas, 17 modos de fusión, opacidad, máscara de recorte (clipping), bloqueo de alfa, duplicar, combinar, rellenar, mover arriba y abajo.
 
-**Herramientas:** relleno (con tolerancia, expandir y referencia a todas las capas), degradado lineal y radial, cuentagotas (también manteniendo el dedo quieto, clic derecho o Alt), selección con lazo, rectángulo y varita mágica (nueva, añadir, quitar), transformar (mover, escalar, girar, voltear), texto con contorno, formas (línea, rectángulo, elipse) y mover vista.
+**Herramientas:** relleno (con tolerancia, expandir y referencia a todas las capas), degradado lineal y radial, cuentagotas (también manteniendo el dedo quieto, clic derecho o Alt), selección con lazo, rectángulo y varita mágica (nueva, añadir, quitar), transformar (mover, escalar, girar, voltear), formas (línea, rectángulo, elipse) y mover vista.
+
+**Texto:** 25 fuentes incluidas (funcionan sin internet), vertical, alineación, negrita y cursiva, contorno con su propio color, relleno degradado, sombra, fondo de caja, redondeado o bocadillo, texto curvo, espacio entre letras e interlineado. Las capas de texto se pueden volver a editar y mover sin perder el texto.
+
+**Cámara:** toma una foto o elige una de la galería para dibujar encima, como dibujo nuevo o como capa. "Foto de un boceto → líneas" convierte un dibujo en papel en líneas listas para colorear.
+
+**Lienzos:** tamaños de pantalla del celular, redes sociales (Instagram, historias, YouTube, X), papel A3/A4/A5/B5/Carta/Postal/Manga en 150, 300 o 350 dpi, pixel art y personalizado.
 
 **Regla de simetría:** vertical, horizontal, cuádruple, radial y caleidoscopio, con centro movible.
 
@@ -34,6 +40,8 @@ La versión web queda en GitHub Pages: `https://jeremygomezf.github.io/Trazo/`. 
 **Gestos:** dos dedos para zoom, mover y girar; tocar con dos dedos deshace y con tres rehace.
 
 **Galería:** todos los dibujos se guardan solos en el dispositivo. Exporta en PNG, PNG transparente, JPG o proyecto `.trazo` con todas las capas.
+
+Comparación detallada con ibisPaint: [docs/comparacion-ibispaint.md](docs/comparacion-ibispaint.md).
 
 ## Atajos de teclado
 
@@ -68,6 +76,7 @@ www/            la app (HTML, CSS y JS sin compilar)
   js/ui.js      interfaz
   js/input.js   lápiz, dedos, mouse, gestos y teclado
 electron/       ventana de escritorio
+www/fonts/      fuentes incluidas (licencias OFL/Apache en LICENCIAS.txt)
 assets/         iconos para Android
 build/          icono de escritorio y firma de Android
 ```

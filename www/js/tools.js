@@ -262,7 +262,7 @@
     },
     text: {
       down: () => true,
-      up: (p) => { setTimeout(() => T.textDialog(p), 60); },
+      up: (p) => { setTimeout(() => T.textTap(p), 60); },
       cancel: () => {}
     },
     move: {
@@ -282,7 +282,7 @@
   }
   function xfApplyLive() { T.live.floatM = xfMatrix(); T.dirty(); }
   function xfStart(L, float, cx, cy, extra) {
-    Object.assign(XF, { active: true, L, float, w: float.width, h: float.height, cx, cy, sx: 1, sy: 1, rot: 0, orig: null, fromSel: false, newLayer: false, drag: null }, extra);
+    Object.assign(XF, { active: true, L, float, w: float.width, h: float.height, cx, cy, sx: 1, sy: 1, rot: 0, orig: null, fromSel: false, newLayer: false, textData: null, drag: null }, extra);
     T.setLive({ layerId: L.id, float, floatM: xfMatrix() });
     T.emit('xf');
   }
@@ -290,6 +290,17 @@
     if (XF.active) return true;
     const L = T.active();
     if (!L.visible) { T.toast('La capa está oculta'); return false; }
+    if (L.text) {
+      // las capas de texto se mueven sin perder la edición del texto
+      const t = L.text, c = T.renderText(t);
+      T.beginEdit(L);
+      const box = T.alphaBox(L.canvas);
+      L.ctx.clearRect(0, 0, D.w, D.h);
+      xfStart(L, c, t.cx, t.cy, { orig: box, textData: t });
+      Object.assign(XF, { sx: t.sx || 1, sy: t.sy || 1, rot: t.rot || 0 });
+      xfApplyLive();
+      return true;
+    }
     let b, float;
     if (SEL.active && SEL.bbox) {
       b = SEL.bbox;
@@ -312,9 +323,11 @@
     xfStart(L, float, b.x + b.w / 2, b.y + b.h / 2, { orig: b, fromSel: SEL.active });
     return true;
   };
-  T.xfStartFloat = function (L, float, cx, cy) {
+  T.xfStartFloat = function (L, float, cx, cy, extra) {
     T.beginEdit(L);
-    xfStart(L, float, cx, cy, { newLayer: true });
+    if (extra && extra.clear) L.ctx.clearRect(0, 0, D.w, D.h);
+    xfStart(L, float, cx, cy, Object.assign({ newLayer: true }, extra || {}));
+    if (extra && extra.geom) Object.assign(XF, extra.geom), xfApplyLive();
     T.setTool('move');
   };
   function corners() {
@@ -392,10 +405,18 @@
     if (XF.orig) { x0 = Math.min(x0, XF.orig.x); y0 = Math.min(y0, XF.orig.y); x1 = Math.max(x1, XF.orig.x + XF.orig.w); y1 = Math.max(y1, XF.orig.y + XF.orig.h); }
     const box = T.clampBox(x0 - 2, y0 - 2, x1 + 2, y1 + 2);
     const fromSel = XF.fromSel;
+    let extra = null;
+    if (XF.textData) {
+      const before = L.text, after = Object.assign({}, XF.textData, { cx: XF.cx, cy: XF.cy, sx: XF.sx, sy: XF.sy, rot: XF.rot });
+      L.text = after;
+      extra = [{ t: 'props', id: L.id, before: { text: before }, after: { text: after } }];
+    }
     XF.active = false;
     XF.drag = null;
+    XF.textData = null;
     T.clearLive();
-    if (box) T.endEdit(L, box);
+    if (box) T.endEdit(L, box, extra, !!extra);
+    T.emit('layers');
     if (fromSel) T.selSet(null, false);
     T.emit('xf');
   };
@@ -405,6 +426,7 @@
     T.restoreSnap(L);
     XF.active = false;
     XF.drag = null;
+    XF.textData = null;
     T.clearLive();
     if (XF.newLayer) {
       const last = T.hist.undo[T.hist.undo.length - 1];
@@ -427,80 +449,252 @@
     T.xfStartFloat(L, c, D.w / 2, D.h / 2);
   };
 
-  /* ---------- Texto ---------- */
+  /* ---------- Texto (capas de texto editables) ---------- */
   T.FONTS = [
-    ['sans-serif', 'Sans'], ['serif', 'Serif'], ['Georgia, serif', 'Georgia'], ['monospace', 'Mono'],
-    ['"Comic Sans MS", "Comic Neue", cursive', 'Cómic'], ['Impact, "Arial Black", sans-serif', 'Impacto'],
-    ['"Brush Script MT", "Segoe Script", cursive', 'Manuscrita'], ['"Trebuchet MS", sans-serif', 'Trebuchet']
+    ['sans-serif', 'Sans'], ['serif', 'Serif'], ['monospace', 'Mono'],
+    ['"Bangers"', 'Bangers'], ['"Luckiest Guy"', 'Luckiest Guy'], ['"Comic Neue"', 'Comic Neue'],
+    ['"Permanent Marker"', 'Marcador'], ['"Pacifico"', 'Pacifico'], ['"Lobster"', 'Lobster'],
+    ['"Dancing Script"', 'Dancing Script'], ['"Caveat"', 'Caveat'], ['"Kalam"', 'Kalam'],
+    ['"Indie Flower"', 'Indie Flower'], ['"Patrick Hand"', 'Patrick Hand'], ['"Amatic SC"', 'Amatic SC'],
+    ['"Bebas Neue"', 'Bebas Neue'], ['"Anton"', 'Anton'], ['"Righteous"', 'Righteous'],
+    ['"Fredoka"', 'Fredoka'], ['"Playfair Display"', 'Playfair'], ['"Cinzel"', 'Cinzel'],
+    ['"Special Elite"', 'Máquina de escribir'], ['"Orbitron"', 'Orbitron'], ['"Press Start 2P"', 'Pixel'],
+    ['"Creepster"', 'Terror']
   ];
-  T.renderText = function (o) {
-    const lines = o.text.split('\n');
-    const font = (o.italic ? 'italic ' : '') + (o.bold ? 'bold ' : '') + o.size + 'px ' + o.font;
+  T.loadFont = async function (font, size) {
+    try { await document.fonts.load((size || 40) + 'px ' + font + ', sans-serif', 'AaÑñáé'); } catch (e) { /* fuente del sistema */ }
+  };
+  T.TEXT_DEFAULTS = {
+    text: '', font: 'sans-serif', size: 72, color: '#1d2433', gradient: false, color2: '#3b5bdb', bold: false, italic: false,
+    align: 'left', vertical: false, letter: 0, line: 1.25, stroke: 0, strokeColor: '#ffffff',
+    shadow: false, shadowColor: '#000000', shadowBlur: 10, shadowX: 4, shadowY: 6, bg: 'none', bgColor: '#ffffff', bgPad: 24, curve: 0
+  };
+
+  T.renderText = function (o0) {
+    const o = Object.assign({}, T.TEXT_DEFAULTS, o0);
+    const size = Math.max(4, o.size), font = (o.italic ? 'italic ' : '') + (o.bold ? 'bold ' : '') + size + 'px ' + o.font + (/serif|monospace/.test(o.font) ? '' : ', sans-serif');
+    const lines = (o.text || ' ').split('\n');
     const m = T.mkCanvas(4, 4).getContext('2d');
     m.font = font;
-    const widths = lines.map((l) => m.measureText(l || ' ').width);
-    const lh = o.size * 1.25, pad = Math.ceil(o.stroke + o.size * 0.25);
-    const W = Math.ceil(Math.max(...widths) + pad * 2), Hh = Math.ceil(lines.length * lh + pad * 2);
-    const c = T.mkCanvas(W, Hh), x = c.getContext('2d');
-    x.font = font;
-    x.textBaseline = 'middle';
-    x.lineJoin = 'round';
-    lines.forEach((l, i) => {
-      const lx = o.align === 'center' ? (W - widths[i]) / 2 : o.align === 'right' ? W - pad - widths[i] : pad;
-      const ly = pad + lh * i + lh / 2;
-      if (o.stroke > 0) { x.lineWidth = o.stroke * 2; x.strokeStyle = o.strokeColor; x.strokeText(l, lx, ly); }
-      x.fillStyle = o.color;
-      x.fillText(l, lx, ly);
-    });
-    return c;
+    const lh = size * o.line, ls = o.letter;
+    const G = [];
+    if (o.vertical) {
+      lines.forEach((line, li) => {
+        const chars = Array.from(line || ' '), Hc = chars.length * (size + ls) - ls;
+        const y0 = o.align === 'center' ? -Hc / 2 : o.align === 'right' ? -Hc : 0;
+        chars.forEach((ch, ci) => G.push({ ch, x: -li * lh, y: y0 + ci * (size + ls) + size / 2, rot: 0 }));
+      });
+    } else {
+      const widths = lines.map((line) => Array.from(line).map((ch) => m.measureText(ch).width));
+      const W = widths.map((w) => w.reduce((a, b) => a + b, 0) + ls * Math.max(0, w.length - 1));
+      const maxW = Math.max(1, ...W);
+      lines.forEach((line, li) => {
+        const chars = Array.from(line), ws = widths[li];
+        const curve = o.curve && chars.length > 1;
+        let x = curve || o.align === 'center' ? -W[li] / 2 : o.align === 'right' ? -W[li] : 0;
+        const y = li * lh;
+        chars.forEach((ch, ci) => {
+          const cx = x + ws[ci] / 2;
+          if (curve) {
+            const sgn = o.curve > 0 ? 1 : -1, ang = (Math.abs(o.curve) / 100) * Math.PI * 1.15, R = maxW / ang, a = cx / R;
+            G.push({ ch, x: R * Math.sin(a), y: y + sgn * R * (1 - Math.cos(a)), rot: sgn * a });
+          } else G.push({ ch, x: cx, y, rot: 0 });
+          x += ws[ci] + ls;
+        });
+      });
+    }
+    if (!G.length) G.push({ ch: ' ', x: 0, y: 0, rot: 0 });
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    G.forEach((g) => { x0 = Math.min(x0, g.x); x1 = Math.max(x1, g.x); y0 = Math.min(y0, g.y); y1 = Math.max(y1, g.y); });
+    const ext = size * 0.75;
+    x0 -= ext; x1 += ext; y0 -= ext; y1 += ext;
+    const pad = Math.ceil(o.stroke + (o.shadow ? o.shadowBlur * 2 + Math.abs(o.shadowX) + Math.abs(o.shadowY) : 0) + (o.bg !== 'none' ? o.bgPad + size * 0.5 : 0) + 8);
+    const W = Math.ceil(x1 - x0 + pad * 2), H = Math.ceil(y1 - y0 + pad * 2), ox = pad - x0, oy = pad - y0;
+    // letras (contorno primero, relleno después para que el contorno no tape letras vecinas)
+    const tl = T.mkCanvas(W, H), tx = tl.getContext('2d');
+    tx.font = font;
+    tx.textAlign = 'center';
+    tx.textBaseline = 'middle';
+    tx.lineJoin = 'round';
+    const each = (fn) => G.forEach((g) => { tx.save(); tx.translate(ox + g.x, oy + g.y); if (g.rot) tx.rotate(g.rot); fn(g.ch); tx.restore(); });
+    if (o.stroke > 0) { tx.lineWidth = o.stroke * 2; tx.strokeStyle = o.strokeColor; each((ch) => tx.strokeText(ch, 0, 0)); }
+    // relleno en su propia capa para que el degradado use coordenadas del lienzo, no de cada letra
+    const fl = T.mkCanvas(W, H), fx = fl.getContext('2d'), keep = tx;
+    fx.font = font; fx.textAlign = 'center'; fx.textBaseline = 'middle';
+    fx.fillStyle = o.color;
+    G.forEach((g) => { fx.save(); fx.translate(ox + g.x, oy + g.y); if (g.rot) fx.rotate(g.rot); fx.fillText(g.ch, 0, 0); fx.restore(); });
+    if (o.gradient) {
+      const gr = fx.createLinearGradient(0, oy + y0 + ext * 0.5, 0, oy + y1 - ext * 0.5);
+      gr.addColorStop(0, o.color);
+      gr.addColorStop(1, o.color2);
+      fx.globalCompositeOperation = 'source-in';
+      fx.fillStyle = gr;
+      fx.fillRect(0, 0, W, H);
+    }
+    keep.drawImage(fl, 0, 0);
+    // fondo
+    const out = T.mkCanvas(W, H), x = out.getContext('2d');
+    if (o.bg !== 'none') {
+      const bx = ox + x0 + ext * 0.35 - o.bgPad, by = oy + y0 + ext * 0.45 - o.bgPad;
+      const bw = x1 - x0 - ext * 0.7 + o.bgPad * 2, bh = y1 - y0 - ext * 0.9 + o.bgPad * 2;
+      x.fillStyle = o.bgColor;
+      x.strokeStyle = o.stroke > 0 ? o.strokeColor : 'rgba(0,0,0,0.85)';
+      x.lineWidth = Math.max(2, size / 22);
+      if (o.bg === 'box') { x.beginPath(); x.rect(bx, by, bw, bh); x.fill(); }
+      else if (o.bg === 'round') { x.beginPath(); x.roundRect(bx, by, bw, bh, Math.min(bw, bh) * 0.3); x.fill(); }
+      else {
+        // bocadillo: primero el borde de óvalo y colita, luego el relleno tapa las líneas interiores
+        const oval = () => { x.beginPath(); x.ellipse(bx + bw / 2, by + bh / 2, bw * 0.62, bh * 0.72, 0, 0, 6.2832); };
+        const tail = () => { x.beginPath(); x.moveTo(bx + bw * 0.24, by + bh * 1.0); x.lineTo(bx + bw * 0.1, by + bh * 1.34); x.lineTo(bx + bw * 0.46, by + bh * 1.1); x.closePath(); };
+        x.lineWidth *= 2;
+        oval(); x.stroke(); tail(); x.stroke();
+        oval(); x.fill(); tail(); x.fill();
+      }
+    }
+    if (o.shadow) { x.shadowColor = o.shadowColor; x.shadowBlur = o.shadowBlur; x.shadowOffsetX = o.shadowX; x.shadowOffsetY = o.shadowY; }
+    x.drawImage(tl, 0, 0);
+    x.shadowColor = 'transparent';
+    const b = T.alphaBox(out);
+    return b ? T.crop(out, { x: Math.max(0, b.x - 2), y: Math.max(0, b.y - 2), w: Math.min(W - Math.max(0, b.x - 2), b.w + 4), h: Math.min(H - Math.max(0, b.y - 2), b.h + 4) }) : out;
   };
-  T.textDialog = function (p) {
-    const P = T.prefs;
-    const ta = T.el('textarea', { class: 'tin', rows: '3', id: 'textIn', placeholder: 'Escribe aquí', autofocus: true });
-    const font = T.el('select', { class: 'tin', id: 'textFont', 'aria-label': 'Tipo de letra' }, T.FONTS.map((f) => T.el('option', { value: f[0], text: f[1], selected: f[0] === P.textFont })));
-    const prev = T.mkCanvas(380, 120);
+
+  /* Selector de color pequeño: muestra, selector del sistema y "usar el color actual" */
+  T.colorField = function (label, value, onChange) {
+    const inp = T.el('input', { type: 'color', value, class: 'cfin', 'aria-label': label });
+    const sw = T.el('span', { class: 'cfsw', style: 'background:' + value });
+    const cur = T.el('button', { type: 'button', class: 'cfcur', title: 'Usar el color actual', 'aria-label': 'Usar el color actual' });
+    cur.style.background = T.prefs.color;
+    const set = (v) => { inp.value = v; sw.style.background = v; onChange(v); };
+    inp.addEventListener('input', () => set(inp.value));
+    cur.addEventListener('click', () => set(T.prefs.color));
+    return T.el('div', { class: 'cf' }, [T.el('span', { class: 'cflabel', text: label }), T.el('label', { class: 'cfpick' }, [sw, inp]), cur]);
+  };
+
+  T.textDialog = function (p, L0) {
+    const P = T.prefs, editing = !!(L0 && L0.text);
+    const o = Object.assign({}, T.TEXT_DEFAULTS, P.textStyle || {}, editing ? L0.text : { color: P.color });
+    if (!editing) o.text = '';
+    const prev = T.mkCanvas(560, 180);
     prev.className = 'tprev';
-    const opts = () => ({ text: ta.value || 'Texto', font: font.value, size: P.textSize, bold: P.textBold, italic: P.textItalic, stroke: P.textStroke, strokeColor: P.color2, color: P.color, align: P.textAlign });
-    const redraw = () => {
-      const c = T.renderText(Object.assign(opts(), { size: Math.min(P.textSize, 56) }));
+    const ta = T.el('textarea', { class: 'tin', rows: '2', id: 'textIn', placeholder: 'Escribe aquí', autofocus: true });
+    ta.value = o.text;
+    let pending = false;
+    const redraw = async () => {
+      if (pending) return;
+      pending = true;
+      await T.loadFont(o.font, 48);
+      pending = false;
+      const c = T.renderText(Object.assign({}, o, { text: ta.value || 'Texto' }));
       const x = prev.getContext('2d');
       x.clearRect(0, 0, prev.width, prev.height);
-      const k = Math.min(1, (prev.width - 8) / c.width, (prev.height - 8) / c.height);
+      const k = Math.min(1, (prev.width - 16) / c.width, (prev.height - 16) / c.height);
       x.drawImage(c, (prev.width - c.width * k) / 2, (prev.height - c.height * k) / 2, c.width * k, c.height * k);
     };
-    const body = T.el('div', { class: 'stack' }, [
-      ta,
-      T.el('div', { class: 'two' }, [font, T.seg({ label: 'Alineación', value: P.textAlign, options: [['left', 'Izq.'], ['center', 'Centro'], ['right', 'Der.']], onChange: (v) => { P.textAlign = v; redraw(); } })]),
-      T.slider({ label: 'Tamaño', min: 8, max: 400, value: P.textSize, unit: ' px', onInput: (v) => { P.textSize = v; redraw(); } }),
-      T.slider({ label: 'Contorno', min: 0, max: 30, value: P.textStroke, unit: ' px', onInput: (v) => { P.textStroke = v; redraw(); } }),
+    const upd = (k) => (v) => { o[k] = v; redraw(); };
+
+    // Pestaña Letra
+    const fonts = T.el('div', { class: 'fontgrid', role: 'listbox', 'aria-label': 'Tipo de letra' });
+    T.FONTS.forEach((f) => {
+      const b = T.el('button', { type: 'button', class: 'fontb', role: 'option', 'aria-selected': f[0] === o.font ? 'true' : 'false', style: 'font-family:' + f[0].replace(/"/g, "'") + ', sans-serif' }, [T.el('span', { class: 'fa', text: 'Aa' }), T.el('span', { class: 'fn', text: f[1] })]);
+      b.addEventListener('click', () => { o.font = f[0]; T.$$('.fontb', fonts).forEach((x) => x.setAttribute('aria-selected', x === b ? 'true' : 'false')); redraw(); });
+      fonts.append(b);
+      T.loadFont(f[0], 20);
+    });
+    const tabLetra = T.el('div', { class: 'stack' }, [
+      fonts,
+      T.slider({ label: 'Tamaño', min: 8, max: 600, value: o.size, unit: ' px', onInput: upd('size') }),
       T.el('div', { class: 'two' }, [
-        T.check({ label: 'Negrita', value: P.textBold, onChange: (v) => { P.textBold = v; redraw(); } }),
-        T.check({ label: 'Cursiva', value: P.textItalic, onChange: (v) => { P.textItalic = v; redraw(); } })
+        T.seg({ label: 'Alineación', value: o.align, options: [['left', 'Izquierda'], ['center', 'Centro'], ['right', 'Derecha']], onChange: upd('align') })
       ]),
-      prev,
-      T.el('p', { class: 'note', text: 'El texto usa el color actual. El contorno usa el color secundario.' })
+      T.el('div', { class: 'two' }, [
+        T.check({ label: 'Vertical', value: o.vertical, onChange: upd('vertical') }),
+        T.check({ label: 'Negrita', value: o.bold, onChange: upd('bold') }),
+        T.check({ label: 'Cursiva', value: o.italic, onChange: upd('italic') })
+      ])
     ]);
+    // Pestaña Color
+    const tabColor = T.el('div', { class: 'stack' }, [
+      T.el('div', { class: 'two' }, [
+        T.colorField('Relleno', o.color, upd('color')),
+        T.check({ label: 'Degradado', value: o.gradient, onChange: upd('gradient') }),
+        T.colorField('Hacia', o.color2, upd('color2'))
+      ]),
+      T.el('h3', { text: 'Contorno' }),
+      T.el('div', { class: 'two' }, [T.colorField('Color', o.strokeColor, upd('strokeColor'))]),
+      T.slider({ label: 'Grosor', min: 0, max: 40, value: o.stroke, unit: ' px', onInput: upd('stroke') }),
+      T.el('h3', { text: 'Fondo' }),
+      T.seg({ label: 'Fondo', value: o.bg, options: [['none', 'Ninguno'], ['box', 'Caja'], ['round', 'Redondeado'], ['bubble', 'Bocadillo']], onChange: upd('bg') }),
+      T.el('div', { class: 'two' }, [T.colorField('Color', o.bgColor, upd('bgColor'))]),
+      T.slider({ label: 'Margen', min: 0, max: 120, value: o.bgPad, unit: ' px', onInput: upd('bgPad') })
+    ]);
+    // Pestaña Efectos
+    const tabFx = T.el('div', { class: 'stack' }, [
+      T.slider({ label: 'Curvar', min: -100, max: 100, value: o.curve, onInput: upd('curve') }),
+      T.slider({ label: 'Espacio letras', min: -30, max: 120, value: o.letter, unit: ' px', onInput: upd('letter') }),
+      T.slider({ label: 'Interlineado', min: 60, max: 300, value: Math.round(o.line * 100), unit: '%', onInput: (v) => upd('line')(v / 100) }),
+      T.el('h3', { text: 'Sombra' }),
+      T.el('div', { class: 'two' }, [T.check({ label: 'Sombra', value: o.shadow, onChange: upd('shadow') }), T.colorField('Color', o.shadowColor, upd('shadowColor'))]),
+      T.slider({ label: 'Difuminado', min: 0, max: 60, value: o.shadowBlur, unit: ' px', onInput: upd('shadowBlur') }),
+      T.slider({ label: 'Desplazar X', min: -60, max: 60, value: o.shadowX, unit: ' px', onInput: upd('shadowX') }),
+      T.slider({ label: 'Desplazar Y', min: -60, max: 60, value: o.shadowY, unit: ' px', onInput: upd('shadowY') })
+    ]);
+    const tabs = { letra: tabLetra, color: tabColor, fx: tabFx };
+    const show = (k) => Object.keys(tabs).forEach((n) => (tabs[n].hidden = n !== k));
+    const tabSeg = T.seg({ label: 'Opciones de texto', value: 'letra', options: [['letra', 'Letra'], ['color', 'Color y fondo'], ['fx', 'Efectos']], onChange: show });
+    tabSeg.classList.add('full');
+    show('letra');
+    const body = T.el('div', { class: 'stack textdlg' }, [prev, ta, tabSeg, tabLetra, tabColor, tabFx]);
     ta.addEventListener('input', redraw);
-    font.addEventListener('change', () => { P.textFont = font.value; redraw(); });
     T.dialog({
-      title: 'Agregar texto', body,
+      title: editing ? 'Editar texto' : 'Agregar texto', body, wide: true,
       actions: [
         { label: 'Cancelar' },
         {
-          label: 'Colocar', primary: true, action: () => {
+          label: editing ? 'Guardar' : 'Colocar', primary: true, action: async () => {
             if (!ta.value.trim()) { T.toast('Escribe algo primero'); return false; }
+            o.text = ta.value;
+            const style = Object.assign({}, o);
+            delete style.text; delete style.cx; delete style.cy; delete style.sx; delete style.sy; delete style.rot;
+            P.textStyle = style;
             T.savePrefs();
-            const c = T.renderText(opts());
-            const L = T.addLayer({ name: 'Texto: ' + ta.value.trim().slice(0, 18) });
-            const cx = T.clamp(p.x + c.width / 2, c.width / 2, Math.max(c.width / 2, D.w - c.width / 2));
-            const cy = T.clamp(p.y, c.height / 2, Math.max(c.height / 2, D.h - c.height / 2));
-            setTimeout(() => T.xfStartFloat(L, c, cx, cy), 0);
+            await T.loadFont(o.font, o.size);
+            const c = T.renderText(o);
+            if (editing) {
+              const t = L0.text;
+              const data = Object.assign({}, o, { cx: t.cx, cy: t.cy, sx: t.sx || 1, sy: t.sy || 1, rot: t.rot || 0 });
+              if (T.xf.active) T.xfCommit();
+              D.activeId = L0.id;
+              T.xfStartFloat(L0, c, t.cx, t.cy, { newLayer: false, clear: true, textData: data, orig: T.alphaBox(L0.canvas), geom: { sx: data.sx, sy: data.sy, rot: data.rot } });
+              L0.name = 'Texto: ' + o.text.trim().slice(0, 18);
+              T.emit('layers');
+            } else {
+              const L = T.addLayer({ name: 'Texto: ' + o.text.trim().slice(0, 18) });
+              const cx = T.clamp(p.x + c.width / 2, c.width / 2, Math.max(c.width / 2, D.w - c.width / 2));
+              const cy = T.clamp(p.y, c.height / 2, Math.max(c.height / 2, D.h - c.height / 2));
+              const data = Object.assign({}, o, { cx, cy, sx: 1, sy: 1, rot: 0 });
+              setTimeout(() => T.xfStartFloat(L, c, cx, cy, { textData: data }), 0);
+            }
           }
         }
       ]
     });
     redraw();
-    setTimeout(() => ta.focus(), 50);
+    if (!T.isTouchDevice) setTimeout(() => ta.focus(), 50);
+  };
+  /* Toque con la herramienta de texto: edita la capa de texto si tocas encima, o crea una nueva */
+  T.textTap = function (p) {
+    const A = T.active();
+    if (A && A.text) {
+      const b = T.alphaBox(A.canvas);
+      if (b && p.x >= b.x - 20 && p.x <= b.x + b.w + 20 && p.y >= b.y - 20 && p.y <= b.y + b.h + 20) { T.textDialog(p, A); return; }
+    }
+    for (let i = D.layers.length - 1; i >= 0; i--) {
+      const L = D.layers[i];
+      if (!L.text || !L.visible) continue;
+      const b = T.alphaBox(L.canvas);
+      if (b && p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) { D.activeId = L.id; T.emit('layers'); T.textDialog(p, L); return; }
+    }
+    T.textDialog(p);
   };
 
   /* ---------- Capa de guías (selección, simetría, transformar, previsualizaciones) ---------- */

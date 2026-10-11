@@ -1,0 +1,23 @@
+/* Fuentes incluidas para la herramienta de texto (licencias en fonts/LICENCIAS.txt) */
+@font-face { font-family: 'Amatic SC'; src: url('../fonts/amatic-sc.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Anton'; src: url('../fonts/anton.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Bangers'; src: url('../fonts/bangers.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Bebas Neue'; src: url('../fonts/bebas-neue.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Caveat'; src: url('../fonts/caveat.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Cinzel'; src: url('../fonts/cinzel.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Comic Neue'; src: url('../fonts/comic-neue.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Creepster'; src: url('../fonts/creepster.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Dancing Script'; src: url('../fonts/dancing-script.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Fredoka'; src: url('../fonts/fredoka.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Indie Flower'; src: url('../fonts/indie-flower.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Kalam'; src: url('../fonts/kalam.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Lobster'; src: url('../fonts/lobster.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Luckiest Guy'; src: url('../fonts/luckiest-guy.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Orbitron'; src: url('../fonts/orbitron.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Pacifico'; src: url('../fonts/pacifico.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Patrick Hand'; src: url('../fonts/patrick-hand.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Permanent Marker'; src: url('../fonts/permanent-marker.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Playfair Display'; src: url('../fonts/playfair-display.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Press Start 2P'; src: url('../fonts/press-start-2p.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Righteous'; src: url('../fonts/righteous.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Special Elite'; src: url('../fonts/special-elite.woff2') format('woff2'); font-display: swap; }
