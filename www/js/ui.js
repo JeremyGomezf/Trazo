@@ -239,6 +239,7 @@
   function renderXfBar() {
     const bar = $('#xfbar');
     bar.hidden = !T.xf.active;
+    $('#optbar').classList.toggle('xfhide', T.xf.active);
     if (!T.xf.active) return;
     if (bar.dataset.built) return;
     bar.dataset.built = '1';

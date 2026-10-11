@@ -260,7 +260,11 @@
       },
       cancel: () => { T.toolOv = null; g = null; T.dirtyOv(); }
     },
-    text: { down: (p) => { T.textDialog(p); return false; } },
+    text: {
+      down: () => true,
+      up: (p) => { setTimeout(() => T.textDialog(p), 60); },
+      cancel: () => {}
+    },
     move: {
       down: (p, info) => T.xfDown(p, info),
       move: (p, info) => T.xfMove(p, info),

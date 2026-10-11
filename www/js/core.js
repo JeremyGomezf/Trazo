@@ -101,7 +101,8 @@
   const cap = window.Capacitor;
   T.platform = cap && cap.isNativePlatform && cap.isNativePlatform() ? 'android' : /Electron\//.test(navigator.userAgent) ? 'desktop' : 'web';
   T.isTouchDevice = matchMedia('(pointer: coarse)').matches;
-  T.isNarrow = () => matchMedia('(max-width: 820px)').matches;
+  T.NARROW_MQ = '(max-width: 820px), (max-height: 520px)';
+  T.isNarrow = () => matchMedia(T.NARROW_MQ).matches;
 
   /* ---------- Eventos ---------- */
   const listeners = {};
