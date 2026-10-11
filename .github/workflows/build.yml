@@ -85,7 +85,7 @@ jobs:
         run: |
           mkdir -p out
           cp android/app/build/outputs/apk/debug/app-debug.apk out/Trazo.apk
-          keytool -printcert -jarfile out/Trazo.apk | grep -i "SHA256"
+          "$ANDROID_HOME"/build-tools/$(ls "$ANDROID_HOME"/build-tools | sort -V | tail -1)/apksigner verify --print-certs out/Trazo.apk | grep -i sha-256 || true
       - uses: actions/upload-artifact@v4
         with:
           name: android
